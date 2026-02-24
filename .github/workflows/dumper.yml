@@ -1,0 +1,81 @@
+name: Dump Firmware Needrom + Buat Repo Baru Otomatis
+
+on:
+  workflow_dispatch:
+    inputs:
+      firmware_url:
+        description: 'Link firmware dari Needrom / Mega / Mediafire'
+        required: true
+        type: string
+      repo_name:
+        description: 'Nama repo BARU (contoh: RedmiNote10Pro-Firmware)'
+        required: true
+        type: string
+      visibility:
+        description: 'Visibility repo'
+        required: true
+        default: 'private'
+        type: choice
+        options:
+          - private
+          - public
+      description:
+        description: 'Deskripsi repo (opsional)'
+        required: false
+        default: 'Firmware extracted from Needrom using techdiwas/Dumper'
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🧹 Free Up Disk Space (+20-35 GB)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          large-packages: true
+          swap-storage: true
+
+      - name: 📥 Checkout Dumper
+        uses: actions/checkout@v4
+        with:
+          repository: techdiwas/Dumper
+
+      - name: ⚙️ Setup Dependencies
+        run: |
+          chmod +x setup.sh
+          sudo ./setup.sh
+
+      - name: 🚀 Jalankan Dumper
+        run: |
+          chmod +x dumper.sh
+          ./dumper.sh "${{ inputs.firmware_url }}"
+
+      - name: 🔑 Setup GitHub Authentication
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          echo "$GH_TOKEN" | gh auth login --with-token
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+      - name: 📤 Buat Repo Baru + Push Hasil Extract
+        if: success()
+        working-directory: out
+        run: |
+          git init -b main
+          git add -A
+          git commit -m "Initial commit: Firmware dump from Needrom
+
+URL: ${{ inputs.firmware_url }}
+Date: $(date)" || echo "✅ No new files to commit"
+
+          gh repo create "${{ inputs.repo_name }}" \
+            --${{ inputs.visibility }} \
+            --source . \
+            --push \
+            -d "${{ inputs.description }}"
+
+          echo "✅ REPO BARU BERHASIL DIBUAT!" 
+          echo "🔗 https://github.com/\( {{ github.repository_owner }}/ \){{ inputs.repo_name }}"
