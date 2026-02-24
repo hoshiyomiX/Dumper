@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       repo_name:
-        description: 'Nama repo BARU (contoh: RedmiNote10Pro-Firmware)'
+        description: 'Nama repo BARU (contoh: RedmiNote10Pro-Firmware) — harus unik!'
         required: true
         type: string
       visibility:
@@ -66,16 +66,13 @@ jobs:
         run: |
           git init -b main
           git add -A
-          git commit -m "Initial commit: Firmware dump from Needrom
+          git commit -m $'Initial commit: Firmware dump from Needrom\n\nURL: \( {{ inputs.firmware_url }}\nDate: '" \)(date)" || echo "✅ No new files to commit (maybe empty extract?)"
 
-URL: ${{ inputs.firmware_url }}
-Date: $(date)" || echo "✅ No new files to commit"
-
-          gh repo create "${{ inputs.repo_name }}" \
+          gh repo create "\( {{ github.repository_owner }}/ \){{ inputs.repo_name }}" \
             --${{ inputs.visibility }} \
             --source . \
             --push \
-            -d "${{ inputs.description }}"
+            --description "${{ inputs.description }}"
 
-          echo "✅ REPO BARU BERHASIL DIBUAT!" 
+          echo "✅ REPO BARU BERHASIL DIBUAT!"
           echo "🔗 https://github.com/\( {{ github.repository_owner }}/ \){{ inputs.repo_name }}"
