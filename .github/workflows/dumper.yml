@@ -23,10 +23,18 @@ on:
         description: 'Deskripsi repo (opsional)'
         required: false
         default: 'Firmware extracted from Needrom using techdiwas/Dumper'
+        type: string
+
+permissions:
+  contents: read
+  repository-projects: write
 
 jobs:
   dump:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      repository-projects: write
 
     steps:
       - name: 🧹 Free Up Disk Space (+20-35 GB)
@@ -54,7 +62,7 @@ jobs:
 
       - name: 🔑 Setup GitHub Authentication
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "$GH_TOKEN" | gh auth login --with-token
           git config --global user.name "GitHub Actions"
@@ -63,16 +71,51 @@ jobs:
       - name: 📤 Buat Repo Baru + Push Hasil Extract
         if: success()
         working-directory: out
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Initialize git repository
           git init -b main
           git add -A
-          git commit -m $'Initial commit: Firmware dump from Needrom\n\nURL: \( {{ inputs.firmware_url }}\nDate: '" \)(date)" || echo "✅ No new files to commit (maybe empty extract?)"
 
-          gh repo create "\( {{ github.repository_owner }}/ \){{ inputs.repo_name }}" \
+          # Create commit with proper message
+          COMMIT_MSG="Initial commit: Firmware dump from Needrom
+
+          URL: ${{ inputs.firmware_url }}
+          Date: $(date '+%Y-%m-%d %H:%M:%S %Z')
+          Extracted by: techdiwas/Dumper"
+
+          git commit -m "$COMMIT_MSG" || {
+            echo "⚠️ No files to commit - extraction might be empty"
+            exit 0
+          }
+
+          # Create new repository and push
+          REPO_NAME="${{ inputs.repo_name }}"
+          REPO_OWNER="${{ github.repository_owner }}"
+
+          echo "📦 Creating repository: ${REPO_OWNER}/${REPO_NAME}"
+
+          gh repo create "${REPO_OWNER}/${REPO_NAME}" \
             --${{ inputs.visibility }} \
             --source . \
             --push \
-            --description "${{ inputs.description }}"
+            --description "${{ inputs.description }}" || {
+            echo "❌ Failed to create repository. It might already exist or token lacks permission."
+            exit 1
+          }
 
           echo "✅ REPO BARU BERHASIL DIBUAT!"
-          echo "🔗 https://github.com/\( {{ github.repository_owner }}/ \){{ inputs.repo_name }}"
+          echo "🔗 https://github.com/${REPO_OWNER}/${REPO_NAME}"
+
+      - name: 📊 Summary
+        if: always()
+        run: |
+          echo "## 📋 Extraction Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Firmware URL** | \`${{ inputs.firmware_url }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Repository** | ${{ github.repository_owner }}/${{ inputs.repo_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Visibility** | ${{ inputs.visibility }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Status** | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
