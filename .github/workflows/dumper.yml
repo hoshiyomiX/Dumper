@@ -58,7 +58,7 @@ jobs:
       - name: 🚀 Jalankan Dumper
         run: |
           chmod +x dumper.sh
-          ./dumper.sh "${{ inputs.firmware_url }}"
+          ./dumper.sh '${{ inputs.firmware_url }}'
 
       - name: 🔑 Setup GitHub Authentication
         env:
